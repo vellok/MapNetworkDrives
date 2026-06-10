@@ -1,1 +1,1 @@
-# zadanie-1
+# App to managage and connect to list of network drives
