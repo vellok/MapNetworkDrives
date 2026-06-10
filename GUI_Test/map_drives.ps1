@@ -1,5 +1,16 @@
+param(
+    [switch]$AdminConnect
+)
+
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
+function Get-SelfPath {
+    if ($PSCommandPath) { return $PSCommandPath }
+    if ($MyInvocation.MyCommand.Path) { return $MyInvocation.MyCommand.Path }
+    return [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+}
+
+$ScriptPath = Get-SelfPath
 $ScriptFolder = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NetworkDriveScript'
 $ConfigFile = Join-Path $ScriptFolder 'drivelist.json'
 
@@ -29,6 +40,12 @@ function Read-DriveList {
 
 function Save-DriveList($drives) {
     $drives | ConvertTo-Json -Depth 4 | Set-Content -Path $ConfigFile -Encoding UTF8
+}
+
+function Write-DebugLog($message) {
+    $logFile = Join-Path $ScriptFolder 'admin-connect-debug.txt'
+    $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff')
+    "$timestamp $message" | Out-File -FilePath $logFile -Append -Encoding UTF8
 }
 
 function Format-DriveEntry($drive) {
@@ -135,6 +152,7 @@ function Show-InputDialog($title, $label1, $default1, $label2, $default2, $usePl
 }
 
 function Show-CredentialDialog() {
+    Write-DebugLog 'Show-CredentialDialog entered.'
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Enter network credentials'
     $form.Size = New-Object System.Drawing.Size(420,220)
@@ -403,29 +421,75 @@ function Connect-DriveListAsAdmin($drives) {
         return 'No drives configured to connect.'
     }
 
-    $credential = Show-CredentialDialog
-    if ($null -eq $credential) { return 'Credential entry cancelled.' }
-
-    $results = New-Object System.Text.StringBuilder
-    $successCount = 0
-    $failedCount = 0
-
-    foreach ($drive in $drives) {
-        $out = Map-SingleDriveAsAdmin $drive $credential
-        if ($out.Success) { $successCount++ } else { $failedCount++ }
-        $results.AppendLine($out.Message) | Out-Null
+    $isExe = ([System.IO.Path]::GetExtension($ScriptPath)).ToLower() -eq '.exe'
+    if ($isExe) {
+        $processFile = $ScriptPath
+        $arguments = @('-AdminConnect')
+    } else {
+        $processFile = 'PowerShell.exe'
+        $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-AdminConnect')
     }
 
-    $summary = "Connected $successCount of $($drives.Count) drive(s) as administrator."
-    if ($failedCount -gt 0) {
-        $summary += " $failedCount failed."
+    Write-DebugLog "Launching elevated process: $processFile $($arguments -join ' ')"
+    try {
+        Start-Process -FilePath $processFile -ArgumentList $arguments -Verb RunAs -Wait -WindowStyle Normal -ErrorAction Stop | Out-Null
+        Write-DebugLog 'Elevated process returned.'
+        return 'Elevated connection attempt completed.'
+    } catch [System.ComponentModel.Win32Exception] {
+        if ($_.Exception.NativeErrorCode -eq 1223) {
+            return 'Admin elevation cancelled by user.'
+        }
+        return "Failed to run elevated connect: $($_.Exception.Message)"
+    } catch {
+        return "Failed to run elevated connect: $($_.Exception.Message)"
     }
-
-    $results.Insert(0, "$summary`n") | Out-Null
-    return $results.ToString()
 }
 
 Ensure-ScriptFolder
+if ($AdminConnect) {
+    Write-DebugLog 'AdminConnect branch entered.'
+    try {
+        $driveList = Read-DriveList
+        if (-not $driveList -or $driveList.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show('No drives configured to connect.','Connect as admin',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            exit 0
+        }
+
+        $credential = Show-CredentialDialog
+        if ($null -eq $credential) {
+            Write-DebugLog 'Show-CredentialDialog returned null.'
+            exit 0
+        }
+
+        Write-DebugLog 'Credential provided, mapping drives.'
+        $results = New-Object System.Text.StringBuilder
+        $successCount = 0
+        $failedCount = 0
+
+        foreach ($drive in $driveList) {
+            Write-DebugLog "Mapping drive $($drive.Letter) -> $($drive.Path)"
+            $out = Map-SingleDrive $drive $credential
+            if ($out.Success) { $successCount++ } else { $failedCount++ }
+            $results.AppendLine($out.Message) | Out-Null
+            Write-DebugLog $out.Message
+        }
+
+        $summary = "Connected $successCount of $($driveList.Count) drive(s) as administrator."
+        if ($failedCount -gt 0) {
+            $summary += " $failedCount failed."
+        }
+        $results.Insert(0, "$summary`n") | Out-Null
+
+        [System.Windows.Forms.MessageBox]::Show($results.ToString(), 'Admin connect results', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        exit 0
+    } catch {
+        Write-DebugLog "AdminConnect branch exception: $($_.Exception.Message)"
+        Write-DebugLog $_.Exception.StackTrace
+        [System.Windows.Forms.MessageBox]::Show("Admin connect failed: $($_.Exception.Message)", 'Error', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        exit 1
+    }
+}
+
 $driveList = Read-DriveList
 if ($driveList -eq $null) { $driveList = @() }
 
