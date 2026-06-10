@@ -4,7 +4,21 @@ param(
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
+# -----------------------------------------------------------------------------
+# GUI Drive Mapper (Windows Forms)
+#
+# Purpose:
+#  - Provide a Windows Forms GUI to manage and map network drives.
+#  - Supports mapping drives as the current user or via a single elevated
+#    run ("Connect as admin") to avoid multiple UAC prompts.
+#
+# Notes:
+#  - The script accepts a switch `-AdminConnect` when launched elevated.
+#  - Keep `param(...)` at the very top so argument parsing works correctly.
+# -----------------------------------------------------------------------------
+
 function Get-SelfPath {
+    # Return the path of the current script or executable (works for ps1 and exe)
     if ($PSCommandPath) { return $PSCommandPath }
     if ($MyInvocation.MyCommand.Path) { return $MyInvocation.MyCommand.Path }
     return [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -15,6 +29,7 @@ $ScriptFolder = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Network
 $ConfigFile = Join-Path $ScriptFolder 'drivelist.json'
 
 function Ensure-ScriptFolder {
+    # Ensure persistent script folder exists for storing the JSON config
     if (-not (Test-Path $ScriptFolder)) {
         New-Item -ItemType Directory -Path $ScriptFolder | Out-Null
     }
@@ -39,20 +54,24 @@ function Read-DriveList {
 }
 
 function Save-DriveList($drives) {
+    # Persist the drive list as JSON to the config file
     $drives | ConvertTo-Json -Depth 4 | Set-Content -Path $ConfigFile -Encoding UTF8
 }
 
 function Write-DebugLog($message) {
+    # Append debug messages to a timestamped log in the script folder
     $logFile = Join-Path $ScriptFolder 'admin-connect-debug.txt'
     $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff')
     "$timestamp $message" | Out-File -FilePath $logFile -Append -Encoding UTF8
 }
 
 function Format-DriveEntry($drive) {
+    # Format a drive entry for display in listboxes
     return "$($drive.Letter) $($drive.Path)"
 }
 
 function Update-DriveListBox($listBox, $drives) {
+    # Refresh the ListBox control to reflect the current drive collection
     $listBox.Items.Clear()
     foreach ($drive in $drives) {
         $listBox.Items.Add((Format-DriveEntry $drive)) | Out-Null
@@ -60,6 +79,7 @@ function Update-DriveListBox($listBox, $drives) {
 }
 
 function Normalize-DriveLetter([string]$rawInput) {
+    # Normalize and validate a provided drive letter; returns upper-case letter or $null
     if ($null -eq $rawInput) { return $null }
     $letter = $rawInput.Trim().TrimEnd(':')
     if ($letter.Length -ne 1) { return $null }
@@ -68,6 +88,7 @@ function Normalize-DriveLetter([string]$rawInput) {
 }
 
 function Show-InputDialog($title, $label1, $default1, $label2, $default2, $usePlaceholder = $true) {
+    # Show a two-field input dialog (used for add/edit drive)
     $form = New-Object System.Windows.Forms.Form
     $form.Text = $title
     $form.Size = New-Object System.Drawing.Size(420,260)
@@ -152,6 +173,7 @@ function Show-InputDialog($title, $label1, $default1, $label2, $default2, $usePl
 }
 
 function Show-CredentialDialog() {
+    # Prompt the user for network credentials and return a PSCredential
     Write-DebugLog 'Show-CredentialDialog entered.'
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Enter network credentials'
@@ -205,6 +227,7 @@ function Show-CredentialDialog() {
 }
 
 function Show-EditDialog($drives) {
+    # Display the dialog to add/remove/edit saved drive entries
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Edit saved drives'
     $form.Size = New-Object System.Drawing.Size(540,360)
@@ -322,15 +345,22 @@ function Show-EditDialog($drives) {
 }
 
 function Map-SingleDrive($drive, [System.Management.Automation.PSCredential]$credential) {
+    # Map a single drive using the provided credential (non-elevated)
+    # Returns a hashtable: @{ Success = $bool; Message = $string }
     $letter = Normalize-DriveLetter $drive.Letter.TrimEnd(':')
     if (-not $letter) {
         return @{Success=$false; Message="Invalid drive letter: $($drive.Letter)"}
     }
     $driveName = "$($letter):"
+
+    # Remove any previous mapping for the letter (ignore errors)
     net use $driveName /delete /y >$null 2>&1
+
+    # Convert SecureString to plain text briefly for net.exe
     $secure = $credential.Password
     $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
     try {
+        # Build and execute net.exe to map the network path
         $arguments = @('use', $driveName, $drive.Path, "/user:$($credential.UserName)", $passwordPlain, '/persistent:no')
         $process = Start-Process -FilePath net.exe -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden -ErrorAction Stop
         if ($process.ExitCode -eq 0) {
@@ -340,6 +370,7 @@ function Map-SingleDrive($drive, [System.Management.Automation.PSCredential]$cre
     } catch {
         return @{Success=$false; Message="Failed to map $driveName -> $($drive.Path): $($_.Exception.Message)"}
     } finally {
+        # Clear plaintext and force GC for security
         $passwordPlain = $null
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()
@@ -347,6 +378,7 @@ function Map-SingleDrive($drive, [System.Management.Automation.PSCredential]$cre
 }
 
 function Map-SingleDriveAsAdmin($drive, [System.Management.Automation.PSCredential]$credential) {
+    # Map a single drive by launching elevated `net.exe` (prompts UAC once if done via single elevated run)
     $letter = Normalize-DriveLetter $drive.Letter.TrimEnd(':')
     if (-not $letter) {
         return @{Success=$false; Message="Invalid drive letter: $($drive.Letter)"}
@@ -356,11 +388,13 @@ function Map-SingleDriveAsAdmin($drive, [System.Management.Automation.PSCredenti
     $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
     try {
         try {
+            # Remove any existing mapping using an elevated delete (may prompt for elevation)
             Start-Process -FilePath net.exe -ArgumentList @('use', $driveName, '/delete', '/y') -Verb RunAs -Wait -WindowStyle Hidden -ErrorAction Stop | Out-Null
         } catch {
             # Ignore delete failures; the drive may not exist yet.
         }
 
+        # Create the mapping elevated
         $arguments = @('use', $driveName, $drive.Path, $passwordPlain, "/user:$($credential.UserName)", '/persistent:no')
         $process = Start-Process -FilePath net.exe -ArgumentList $arguments -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ErrorAction Stop
         if ($process.ExitCode -eq 0) {
@@ -375,6 +409,7 @@ function Map-SingleDriveAsAdmin($drive, [System.Management.Automation.PSCredenti
     } catch {
         return @{Success=$false; Message="Failed to map $driveName -> $($drive.Path) as administrator: $($_.Exception.Message)"}
     } finally {
+        # Clear plaintext and force GC
         $passwordPlain = $null
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()

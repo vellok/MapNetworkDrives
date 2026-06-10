@@ -3,6 +3,19 @@ param(
     [string]$OutputPath = 'gui\MapMyDrivesGUI.exe'
 )
 
+# -----------------------------------------------------------------------------
+# Build helper for GUI executable
+#
+# Purpose:
+#  - Wraps the `ps2exe` module to create a standalone GUI executable from the
+#    GUI PowerShell script. This helper removes any existing output and then
+#    compiles the script into `gui\MapMyDrivesGUI.exe` by default.
+#
+# Usage:
+#  - From repository root: `pwsh .\buildGUIExe.ps1`
+#  - Optionally pass `-ScriptPath` / `-OutputPath` to override defaults.
+# -----------------------------------------------------------------------------
+
 Write-Host "Building executable from $ScriptPath to $OutputPath"
 
 Import-Module ps2exe -ErrorAction Stop

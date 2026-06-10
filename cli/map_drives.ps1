@@ -1,17 +1,33 @@
-# Saved drive list and interactive network drive mapping
-# This script stores only the drive letter / share list in a JSON file.
-# Credentials are requested each time and are not persisted.
+# -----------------------------------------------------------------------------
+# CLI Drive Mapper
+#
+# Purpose:
+#  - Command-line interface for managing a list of network drive mappings.
+#  - Stores only drive letters and UNC paths in a JSON config under
+#    the user's Documents folder (NetworkDriveScript/drivelist.json).
+#  - Prompts for network credentials each time; credentials are NOT persisted.
+#
+# Usage:
+#  - Run in PowerShell: `pwsh map_drives.ps1` or use the launcher `MapMyDrives.cmd`.
+#  - Add / remove / edit saved drives and use the Connect action to map them.
+#
+# Notes:
+#  - This file contains only the CLI (text) UI logic. Shared mapping helpers
+#    are kept inline for simplicity; consider extracting to a module if needed.
+# -----------------------------------------------------------------------------
 
 $ScriptFolder = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NetworkDriveScript'
 $ConfigFile = Join-Path $ScriptFolder "drivelist.json"
 
 function Ensure-ScriptFolder {
+    # Ensure the script storage folder exists (creates Documents\NetworkDriveScript)
     if (-not (Test-Path $ScriptFolder)) {
         New-Item -ItemType Directory -Path $ScriptFolder | Out-Null
     }
 }
 
 function Read-DriveList {
+    # Read the saved drive list JSON and return an array of drive objects
     if (-not (Test-Path $ConfigFile)) {
         return @()
     }
@@ -30,10 +46,12 @@ function Read-DriveList {
 }
 
 function Save-DriveList($drives) {
+    # Save the drive list array as JSON to the config file
     $drives | ConvertTo-Json -Depth 4 | Out-File -FilePath $ConfigFile -Encoding UTF8
 }
 
 function Show-DriveList($drives) {
+    # Print a numbered list of saved drives to the console
     if ($drives.Count -eq 0) {
         Write-Host "No saved drives found." -ForegroundColor Yellow
         return
@@ -47,6 +65,7 @@ function Show-DriveList($drives) {
 }
 
 function Read-Choice([string]$prompt, [string[]]$options) {
+    # Display a simple numbered choice prompt and return the selected option
     while ($true) {
         Write-Host "`n$prompt"
         for ($i = 0; $i -lt $options.Length; $i++) {
@@ -64,6 +83,7 @@ function Read-Choice([string]$prompt, [string[]]$options) {
 }
 
 function Read-YesNo([string]$prompt, [string]$default = 'Y') {
+    # Prompt for a yes/no answer (returns $true/$false)
     $default = $default.ToUpper()
     while ($true) {
         $response = Read-Host "$prompt [Y/N] (default: $default)"
@@ -79,6 +99,7 @@ function Read-YesNo([string]$prompt, [string]$default = 'Y') {
 }
 
 function Normalize-DriveLetter([string]$rawInput) {
+    # Normalize user input into an uppercase single-letter drive (no colon)
     if ($null -eq $rawInput) { return $null }
     $letter = $rawInput.Trim().TrimEnd(':')
     if ($letter.Length -ne 1) { return $null }
@@ -87,6 +108,7 @@ function Normalize-DriveLetter([string]$rawInput) {
 }
 
 function Prompt-DriveLetter($existingLetters) {
+    # Prompt user for a drive letter and validate it isn't already used
     while ($true) {
         $raw = Read-Host 'Enter drive letter (for example Z)'
         $letter = Normalize-DriveLetter $raw
@@ -103,6 +125,7 @@ function Prompt-DriveLetter($existingLetters) {
 }
 
 function Prompt-DrivePath {
+    # Prompt user for the UNC path and validate non-empty input
     while ($true) {
         $path = Read-Host 'Enter network path (UNC path, e.g. \\server\share)'
         if ([string]::IsNullOrWhiteSpace($path)) {
@@ -114,6 +137,7 @@ function Prompt-DrivePath {
 }
 
 function Add-Drive($drives) {
+    # Create a new drive entry (Letter + Path) and append to the list
     $drives = @($drives)
     $existingLetters = $drives | ForEach-Object { $_.Letter }
     $letter = Prompt-DriveLetter $existingLetters
@@ -127,6 +151,7 @@ function Add-Drive($drives) {
 }
 
 function Remove-Drive($drives) {
+    # Remove a selected drive from the list by its displayed index
     if ($drives.Count -eq 0) {
         Write-Host 'No drives to remove.' -ForegroundColor Yellow
         return $drives
@@ -147,6 +172,7 @@ function Remove-Drive($drives) {
 }
 
 function Edit-DriveList($drives) {
+    # Loop to allow adding or removing drives until user finishes
     while ($true) {
         Write-Host ''
         Show-DriveList $drives
@@ -173,6 +199,7 @@ function Edit-DriveList($drives) {
 }
 
 function Get-NetworkCredential {
+    # Prompt the user for network credentials and return a PSCredential
     while ($true) {
         Write-Host 'Enter network credentials for drive mapping' -ForegroundColor Cyan
         $username = Read-Host 'Username (e.g. DOMAIN\user)'
@@ -192,6 +219,7 @@ function Get-NetworkCredential {
 }
 
 function Map-SingleDrive($drive, [System.Management.Automation.PSCredential]$credential) {
+    # Map a single drive using `net use` with supplied credentials (non-elevated)
     $letter = Normalize-DriveLetter $drive.Letter.TrimEnd(':')
     if (-not $letter) {
         Write-Warning "Skipping invalid drive letter: $($drive.Letter)"
@@ -202,11 +230,14 @@ function Map-SingleDrive($drive, [System.Management.Automation.PSCredential]$cre
     net use $driveName /delete /y >$null 2>&1
     Remove-PSDrive -Name $letter -ErrorAction SilentlyContinue -Force | Out-Null
 
+    # Convert SecureString to plain text for passing to net.exe (short-lived)
     $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
         [Runtime.InteropServices.Marshal]::SecureStringToBSTR($credential.Password)
     )
 
     try {
+        # Call `net use` to map the network drive. We pass the username and password
+        # as separate arguments so net.exe can authenticate to the remote share.
         $arguments = @('use', $driveName, $drive.Path, "/user:$($credential.UserName)", $passwordPlain, '/persistent:no')
         $process = Start-Process -FilePath net.exe -ArgumentList $arguments -Wait -NoNewWindow -PassThru -ErrorAction Stop
 
@@ -218,6 +249,7 @@ function Map-SingleDrive($drive, [System.Management.Automation.PSCredential]$cre
     } catch {
         Write-Warning "Failed to map $driveName -> $($drive.Path): $($_.Exception.Message)"
     } finally {
+        # Clear the plaintext password variable as soon as possible
         $passwordPlain = $null
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()
