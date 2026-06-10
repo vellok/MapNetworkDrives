@@ -1,10 +1,17 @@
-# App to managage and connect to list of network drives
+# App to manage and connect to a list of network drives
 
-Text_Based:
--original script that worked in commandline
--only connected drives as basic user
+This repository contains two versions of the drive mapper:
 
-GUI_Test:
--opens a GUI app by clicking .\Gui_TEST\MapMyDrives.CMD or .\Gui_TEST\MapMyDrives.exe
--allowes both connecting drives as basic user as well as Admin
--run .\BuildGUIExe.ps1 to rebuild new Gui exe after each update to scripts
+- CLI version:
+  - `cli\map_drives.ps1`
+  - `cli\MapMyDrives.cmd`
+  - command-line/terminal interaction only
+
+- GUI version:
+  - `gui\map_drives.gui.ps1`
+  - `gui\MapMyDrivesGUI.cmd`
+  - `gui\MapMyDrivesGUI.exe`
+  - runs a Windows Forms GUI and supports normal or elevated mapping
+
+To rebuild the GUI executable after changes:
+- `pwsh .\buildGUIExe.ps1`

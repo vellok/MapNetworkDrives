@@ -1,6 +1,6 @@
 param(
-    [string]$ScriptPath = 'GUI_Test\map_drives.ps1',
-    [string]$OutputPath = 'GUI_Test\MapMyDrives.exe'
+    [string]$ScriptPath = 'gui\map_drivesGUI.ps1',
+    [string]$OutputPath = 'gui\MapMyDrivesGUI.exe'
 )
 
 Write-Host "Building executable from $ScriptPath to $OutputPath"
