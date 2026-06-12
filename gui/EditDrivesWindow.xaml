@@ -1,0 +1,112 @@
+<Window x:Class="MapNetworkDrives.EditDrivesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit Saved Drives" Height="500" Width="650"
+        WindowStartupLocation="CenterOwner"
+        Background="#F5F5F5"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI" FontSize="11"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#007ACC"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="LightBorderBrush" Color="#D0D0D0"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#E81B23"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#107C10"/>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#005A9E"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <Style x:Key="SuccessButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        </Style>
+
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LightBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
+        </Style>
+
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Header -->
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource LightBorderBrush}" BorderThickness="0,0,0,1" Padding="15,15">
+            <StackPanel>
+                <TextBlock Text="Edit Saved Drives" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+                <TextBlock Text="Add, edit, or remove drives from your list" FontSize="10" Foreground="#666666" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,20">
+
+            <!-- Drive List -->
+            <Label Content="Saved Drives" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <ListBox x:Name="DriveListBox" 
+                     Height="250" 
+                     Margin="0,0,0,15"
+                     ItemsSource="{Binding DriveItems}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,6" Height="40">
+                            <TextBlock Text="🗂" Margin="0,0,12,0" FontSize="14"/>
+                            <StackPanel VerticalAlignment="Center" Margin="0">
+                                <TextBlock Text="{Binding Letter}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" FontSize="12"/>
+                                <TextBlock Text="{Binding Path}" FontSize="10" Foreground="#666666"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,15">
+                <Button x:Name="AddButton" Content="➕ Add Drive" Style="{StaticResource PrimaryButtonStyle}" Width="120"/>
+                <Button x:Name="EditButton" Content="✎ Edit Selected" Style="{StaticResource PrimaryButtonStyle}" Width="120"/>
+                <Button x:Name="RemoveButton" Content="🗑 Remove Selected" Style="{StaticResource DangerButtonStyle}" Width="150"/>
+            </StackPanel>
+
+            <!-- Info Box -->
+            <Border Background="#E7F3FF" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="1" CornerRadius="4" Padding="10">
+                <TextBlock x:Name="InfoLabel" Text="Select a drive to edit or remove" FontSize="10" Foreground="#0078D4"/>
+            </Border>
+
+            <!-- Bottom Buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,20,0,0">
+                <Button x:Name="DoneButton" Content="Done" Style="{StaticResource SuccessButtonStyle}" Width="100"/>
+                <Button x:Name="CancelButton" Content="Cancel" Background="A0A0A0" Foreground="White" FontWeight="SemiBold" Padding="12,8" Width="100" BorderThickness="0" Cursor="Hand"/>
+            </StackPanel>
+        </StackPanel>
+    </DockPanel>
+</Window>

@@ -1,0 +1,160 @@
+<Window x:Class="MapNetworkDrives.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Map My Drives" Height="500" Width="650"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5"
+        Icon="pack://application:,,,/Resources/drive-icon.ico"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI" FontSize="11">
+
+    <Window.Resources>
+        <!-- Color Palette -->
+        <Color x:Key="PrimaryColor">#007ACC</Color>
+        <Color x:Key="PrimaryDarkColor">#005A9E</Color>
+        <Color x:Key="AccentColor">#107C10</Color>
+        <Color x:Key="WarningColor">#FFB900</Color>
+        <Color x:Key="DangerColor">#E81B23</Color>
+        <Color x:Key="BackgroundColor">#F5F5F5</Color>
+        <Color x:Key="TextColor">#333333</Color>
+        <Color x:Key="LightBorderColor">#D0D0D0</Color>
+
+        <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+        <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+        <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}"/>
+
+        <!-- Button Style -->
+        <Style x:Key="ModernButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary Button Style (Admin/Edit) -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        </Style>
+
+        <!-- Danger Button Style (Exit/Delete) -->
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <!-- ListBox Style -->
+        <Style x:Key="ModernListBoxStyle" TargetType="ListBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LightBorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
+        </Style>
+
+        <!-- Label Header Style -->
+        <Style x:Key="HeaderLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        </Style>
+
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Header -->
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource LightBorderColor}" BorderThickness="0,0,0,1" Padding="20,15">
+            <StackPanel>
+                <TextBlock Text="Map My Drives" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+                <TextBlock Text="Manage and connect to your saved network drives" FontSize="11" Foreground="#666666" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,20,20,0">
+
+            <!-- Drive List Section -->
+            <Label Content="Saved Network Drives" Style="{StaticResource HeaderLabelStyle}" Margin="0,0,0,8"/>
+            <ListBox x:Name="DriveListBox" 
+                     Style="{StaticResource ModernListBoxStyle}"
+                     Height="200" 
+                     Margin="0,0,0,15"
+                     ItemsSource="{Binding DriveItems}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="🗂" Margin="0,0,8,0" FontSize="12"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Letter}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Text="{Binding Path}" FontSize="10" Foreground="#666666"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Drive Count Info -->
+            <Border Background="#E7F3FF" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,15">
+                <TextBlock x:Name="DriveCountLabel" Text="No drives configured yet" Foreground="{StaticResource PrimaryBrush}" FontSize="11"/>
+            </Border>
+
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,15" HorizontalAlignment="Center" Height="40">
+                <Button x:Name="ConnectButton" 
+                        Content="Connect" 
+                        Style="{StaticResource ModernButtonStyle}"
+                        Width="120" 
+                        Margin="0,0,8,0"/>
+                <Button x:Name="ConnectAdminButton" 
+                        Content="Connect as Admin" 
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Width="140"
+                        Margin="0,0,8,0"/>
+                <Button x:Name="EditListButton" 
+                        Content="Edit List" 
+                        Style="{StaticResource ModernButtonStyle}"
+                        Width="120"
+                        Margin="0,0,8,0"/>
+                <Button x:Name="ExitButton" 
+                        Content="Exit" 
+                        Style="{StaticResource DangerButtonStyle}"
+                        Width="100"/>
+            </StackPanel>
+
+            <!-- Status Message -->
+            <Label Content="Status" Style="{StaticResource HeaderLabelStyle}" Margin="0,10,0,8"/>
+            <TextBox x:Name="StatusBox" 
+                     Background="White"
+                     BorderBrush="{StaticResource LightBorderColor}"
+                     BorderThickness="1"
+                     Padding="10,8"
+                     Height="80"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     IsReadOnly="True"
+                     Text="Ready. Choose an action to begin."
+                     Margin="0,0,0,0"/>
+        </StackPanel>
+    </DockPanel>
+</Window>
